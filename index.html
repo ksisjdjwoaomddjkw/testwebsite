@@ -46,14 +46,6 @@
                 autocomplete="current-password"
             >
 
-            <input
-                id="username"
-                type="text"
-                placeholder="Username"
-                maxlength="20"
-                class="hidden"
-            >
-
             <button id="auth-button">
                 Log in
             </button>
@@ -66,46 +58,107 @@
 
         </section>
 
-<section id="verification-section" class="card hidden">
+<section
+    id="verification-section"
+    class="card hidden"
+>
 
-    <h2>Verify your email</h2>
+    <h2>Check your email</h2>
 
     <p>
         We sent a verification link to:
     </p>
 
-    <strong id="verification-email"></strong>
+    <strong
+        id="verification-email"
+    ></strong>
 
     <p>
-        Check your inbox and click the verification link.
+        Open the email and click the
+        verification link to verify your
+        email address.
     </p>
 
-    <button id="check-verification-button">
+    <div class="verification-help">
+
+        <strong>Don't see the email?</strong>
+
+        <p>
+            Check your
+            <strong>Spam</strong> or
+            <strong>Junk</strong> folder.
+            It may also take a few minutes
+            to arrive.
+        </p>
+
+    </div>
+
+    <p>
+        After clicking the verification link,
+        <strong>come back to this page</strong>
+        and click the button below.
+    </p>
+
+
+    <button
+        id="check-verification-button"
+    >
         I've verified my email
     </button>
 
-    <button id="resend-verification-button">
+
+    <button
+        id="resend-verification-button"
+    >
         Resend verification email
     </button>
 
-    <div id="username-setup" class="hidden">
 
-        <h3>Choose your username</h3>
+    <p
+        id="verification-message"
+    ></p>
+
+
+    <!-- ==================================
+         USERNAME SETUP
+         ================================== -->
+
+    <div
+        id="username-setup"
+        class="hidden"
+    >
+
+        <hr>
+
+        <h2>Choose your username</h2>
+
+        <p>
+            Your email has been verified!
+            Now choose a username for your
+            account.
+        </p>
 
         <input
             id="verified-username"
             type="text"
             placeholder="Username"
             maxlength="20"
+            autocomplete="username"
         >
 
-        <button id="claim-username-button">
+        <button
+            id="claim-username-button"
+        >
             Continue
         </button>
 
-        <p id="username-error" class="error"></p>
+        <p
+            id="username-error"
+            class="error"
+        ></p>
 
     </div>
+
 
     <button
         id="verification-logout-button"
@@ -113,8 +166,6 @@
     >
         Log out
     </button>
-
-    <p id="verification-message"></p>
 
 </section>
         
