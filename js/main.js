@@ -4,7 +4,7 @@ import {
     signup,
     logout,
     resendVerificationEmail,
-    refreshVerificationStatus,
+    checkEmailVerified,
     getAuthError
 } from "./auth.js";
 
@@ -27,77 +27,51 @@ import {
 
 
 // ========================================
-// DOM ELEMENTS
+// AUTH ELEMENTS
 // ========================================
 
 const authSection =
-    document.getElementById(
-        "auth-section"
-    );
-
-const verificationSection =
-    document.getElementById(
-        "verification-section"
-    );
-
-const socialSection =
-    document.getElementById(
-        "social-section"
-    );
+    document.getElementById("auth-section");
 
 const authTitle =
-    document.getElementById(
-        "auth-title"
-    );
+    document.getElementById("auth-title");
 
 const emailInput =
-    document.getElementById(
-        "email"
-    );
+    document.getElementById("email");
 
 const passwordInput =
-    document.getElementById(
-        "password"
-    );
+    document.getElementById("password");
 
 const usernameInput =
-    document.getElementById(
-        "username"
-    );
+    document.getElementById("username");
 
 const authButton =
-    document.getElementById(
-        "auth-button"
-    );
+    document.getElementById("auth-button");
 
 const switchAuth =
-    document.getElementById(
-        "switch-auth"
-    );
+    document.getElementById("switch-auth");
 
 const authError =
-    document.getElementById(
-        "auth-error"
-    );
-
-const logoutButton =
-    document.getElementById(
-        "logout-button"
-    );
-
-const currentUser =
-    document.getElementById(
-        "current-user"
-    );
+    document.getElementById("auth-error");
 
 
 // ========================================
 // VERIFICATION ELEMENTS
 // ========================================
 
+const verificationSection =
+    document.getElementById(
+        "verification-section"
+    );
+
 const verificationEmail =
     document.getElementById(
         "verification-email"
+    );
+
+const verificationMessage =
+    document.getElementById(
+        "verification-message"
     );
 
 const checkVerificationButton =
@@ -115,14 +89,9 @@ const verificationLogoutButton =
         "verification-logout-button"
     );
 
-const verificationMessage =
-    document.getElementById(
-        "verification-message"
-    );
-
 
 // ========================================
-// USERNAME SETUP
+// USERNAME ELEMENTS
 // ========================================
 
 const usernameSetup =
@@ -147,8 +116,23 @@ const usernameError =
 
 
 // ========================================
-// POST ELEMENTS
+// SOCIAL ELEMENTS
 // ========================================
+
+const socialSection =
+    document.getElementById(
+        "social-section"
+    );
+
+const logoutButton =
+    document.getElementById(
+        "logout-button"
+    );
+
+const currentUser =
+    document.getElementById(
+        "current-user"
+    );
 
 const postText =
     document.getElementById(
@@ -185,14 +169,20 @@ const postTemplate =
 // STATE
 // ========================================
 
-let loginMode =
-    true;
+let loginMode = true;
 
-let unsubscribePosts =
-    null;
+let currentAuthUser = null;
 
-let currentAuthUser =
-    null;
+let unsubscribePosts = null;
+
+let verificationEmailAddress = "";
+
+
+// ========================================
+// INITIAL UI
+// ========================================
+
+showAuthScreen();
 
 
 // ========================================
@@ -203,13 +193,9 @@ switchAuth.addEventListener(
     "click",
     () => {
 
-        loginMode =
-            !loginMode;
+        loginMode = !loginMode;
 
-
-        authError.textContent =
-            "";
-
+        authError.textContent = "";
 
         if (loginMode) {
 
@@ -221,7 +207,6 @@ switchAuth.addEventListener(
 
             switchAuth.textContent =
                 "Create an account";
-
 
             usernameInput.classList.add(
                 "hidden"
@@ -237,7 +222,6 @@ switchAuth.addEventListener(
 
             switchAuth.textContent =
                 "Already have an account? Log in";
-
 
             usernameInput.classList.remove(
                 "hidden"
@@ -255,9 +239,7 @@ authButton.addEventListener(
     "click",
     async () => {
 
-        authError.textContent =
-            "";
-
+        authError.textContent = "";
 
         const email =
             emailInput.value.trim();
@@ -266,26 +248,25 @@ authButton.addEventListener(
             passwordInput.value;
 
 
-        if (
-            !email ||
-            !password
-        ) {
+        if (!email) {
 
             authError.textContent =
-                "Enter your email and password.";
+                "Enter your email.";
 
             return;
         }
 
 
-        /*
-         * Username is NOT required here anymore.
-         *
-         * It is selected after email verification.
-         */
+        if (!password) {
 
-        authButton.disabled =
-            true;
+            authError.textContent =
+                "Enter your password.";
+
+            return;
+        }
+
+
+        authButton.disabled = true;
 
 
         try {
@@ -299,6 +280,13 @@ authButton.addEventListener(
 
             } else {
 
+                /*
+                 * Username is intentionally NOT
+                 * created yet.
+                 *
+                 * It happens after verification.
+                 */
+
                 await signup(
                     email,
                     password
@@ -306,14 +294,9 @@ authButton.addEventListener(
             }
 
 
-            emailInput.value =
-                "";
-
-            passwordInput.value =
-                "";
-
-            usernameInput.value =
-                "";
+            emailInput.value = "";
+            passwordInput.value = "";
+            usernameInput.value = "";
 
 
         } catch (error) {
@@ -323,15 +306,217 @@ authButton.addEventListener(
                 error
             );
 
-
             authError.textContent =
-                getAuthError(
-                    error
-                );
+                getAuthError(error);
 
         } finally {
 
-            authButton.disabled =
+            authButton.disabled = false;
+        }
+    }
+);
+
+
+// ========================================
+// AUTH STATE
+// ========================================
+
+listenForAuth(
+    async (user) => {
+
+        currentAuthUser = user;
+
+
+        /*
+         * Logged out.
+         */
+
+        if (!user) {
+
+            showAuthScreen();
+
+            return;
+        }
+
+
+        /*
+         * Account exists but email is
+         * not verified.
+         */
+
+        if (!user.emailVerified) {
+
+            showVerificationScreen(
+                user
+            );
+
+            return;
+        }
+
+
+        /*
+         * Email is verified.
+         *
+         * Check whether the user already
+         * has a username.
+         */
+
+        listenToUser(
+            user.uid,
+            (userData) => {
+
+                if (
+                    userData &&
+                    userData.username
+                ) {
+
+                    showSocialScreen(
+                        user,
+                        userData
+                    );
+
+                } else {
+
+                    showUsernameScreen();
+                }
+            }
+        );
+    }
+);
+
+
+// ========================================
+// VERIFICATION SCREEN
+// ========================================
+
+function showVerificationScreen(
+    user
+) {
+
+    hideAllScreens();
+
+    verificationSection.classList.remove(
+        "hidden"
+    );
+
+
+    verificationEmailAddress =
+        user.email || "";
+
+
+    verificationEmail.textContent =
+        verificationEmailAddress;
+
+
+    verificationMessage.textContent =
+        "";
+
+
+    /*
+     * Show verification instructions.
+     */
+
+    checkVerificationButton.classList.remove(
+        "hidden"
+    );
+
+    resendVerificationButton.classList.remove(
+        "hidden"
+    );
+
+
+    /*
+     * Username setup must remain hidden
+     * until verification succeeds.
+     */
+
+    usernameSetup.classList.add(
+        "hidden"
+    );
+
+
+    verifiedUsername.value = "";
+
+    usernameError.textContent = "";
+}
+
+
+// ========================================
+// CHECK VERIFICATION
+// ========================================
+
+checkVerificationButton.addEventListener(
+    "click",
+    async () => {
+
+        verificationMessage.textContent =
+            "Checking your email verification...";
+
+        checkVerificationButton.disabled =
+            true;
+
+
+        try {
+
+            const verified =
+                await checkEmailVerified();
+
+
+            if (!verified) {
+
+                verificationMessage.textContent =
+                    "Your email hasn't been verified yet. Please click the verification link in the email first.";
+
+                return;
+            }
+
+
+            /*
+             * Success!
+             */
+
+            verificationMessage.textContent =
+                "Email verified successfully!";
+
+
+            checkVerificationButton.classList.add(
+                "hidden"
+            );
+
+            resendVerificationButton.classList.add(
+                "hidden"
+            );
+
+
+            /*
+             * Give the user a moment to see
+             * the success message.
+             */
+
+            setTimeout(
+                () => {
+
+                    showUsernameScreen();
+
+                },
+                700
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Verification check error:",
+                error
+            );
+
+
+            verificationMessage.textContent =
+                "We couldn't check your verification status. Please try again.";
+
+        } finally {
+
+            checkVerificationButton.disabled =
                 false;
         }
     }
@@ -339,27 +524,75 @@ authButton.addEventListener(
 
 
 // ========================================
-// LOGOUT
+// RESEND VERIFICATION
 // ========================================
 
-logoutButton.addEventListener(
+resendVerificationButton.addEventListener(
     "click",
     async () => {
 
+        verificationMessage.textContent =
+            "Sending another verification email...";
+
+        resendVerificationButton.disabled =
+            true;
+
+
         try {
 
-            await logout();
+            await resendVerificationEmail();
+
+
+            verificationMessage.textContent =
+                "Verification email sent. Check your inbox and your Spam/Junk folder.";
 
         } catch (error) {
 
             console.error(
-                "Logout error:",
+                "Resend error:",
                 error
+            );
+
+
+            if (
+                error.code ===
+                "auth/too-many-requests"
+            ) {
+
+                verificationMessage.textContent =
+                    "Too many emails have been requested. Please wait a while before trying again.";
+
+            } else {
+
+                verificationMessage.textContent =
+                    error.message ||
+                    "Unable to send the verification email.";
+            }
+
+        } finally {
+
+            /*
+             * Don't leave the button permanently
+             * disabled.
+             */
+
+            setTimeout(
+                () => {
+
+                    resendVerificationButton.disabled =
+                        false;
+
+                },
+                3000
             );
         }
     }
 );
 
+
+// ========================================
+// VERIFICATION LOGOUT
+// ========================================
 
 verificationLogoutButton.addEventListener(
     "click",
@@ -381,135 +614,38 @@ verificationLogoutButton.addEventListener(
 
 
 // ========================================
-// CHECK EMAIL VERIFICATION
+// USERNAME SCREEN
 // ========================================
 
-checkVerificationButton.addEventListener(
-    "click",
-    async () => {
+function showUsernameScreen() {
 
-        verificationMessage.textContent =
-            "Checking...";
+    hideAllScreens();
 
-
-        checkVerificationButton.disabled =
-            true;
+    verificationSection.classList.remove(
+        "hidden"
+    );
 
 
-        try {
-
-            const verified =
-                await refreshVerificationStatus();
+    verificationMessage.textContent =
+        "Your email has been verified! Now choose your username.";
 
 
-            if (!verified) {
+    checkVerificationButton.classList.add(
+        "hidden"
+    );
 
-                verificationMessage.textContent =
-                    "Your email is not verified yet. Check your inbox and click the verification link.";
-
-                return;
-            }
-
-
-            /*
-             * Email is verified.
-             *
-             * Now show username setup.
-             */
-
-            verificationMessage.textContent =
-                "Email verified! Choose your username.";
+    resendVerificationButton.classList.add(
+        "hidden"
+    );
 
 
-            usernameSetup.classList.remove(
-                "hidden"
-            );
+    usernameSetup.classList.remove(
+        "hidden"
+    );
 
 
-            checkVerificationButton.classList.add(
-                "hidden"
-            );
-
-
-            resendVerificationButton.classList.add(
-                "hidden"
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                "Verification error:",
-                error
-            );
-
-
-            verificationMessage.textContent =
-                "Unable to check verification status.";
-
-        } finally {
-
-            checkVerificationButton.disabled =
-                false;
-        }
-    }
-);
-
-
-// ========================================
-// RESEND VERIFICATION EMAIL
-// ========================================
-
-resendVerificationButton.addEventListener(
-    "click",
-    async () => {
-
-        verificationMessage.textContent =
-            "Sending...";
-
-
-        resendVerificationButton.disabled =
-            true;
-
-
-        try {
-
-            await resendVerificationEmail();
-
-
-            verificationMessage.textContent =
-                "Verification email sent! Check your inbox.";
-
-        } catch (error) {
-
-            console.error(
-                "Resend verification error:",
-                error
-            );
-
-
-            if (
-                error.code ===
-                "auth/too-many-requests"
-            ) {
-
-                verificationMessage.textContent =
-                    "Too many requests. Please wait before trying again.";
-
-            } else {
-
-                verificationMessage.textContent =
-                    error.message ||
-                    "Unable to send verification email.";
-            }
-
-        } finally {
-
-            resendVerificationButton.disabled =
-                false;
-        }
-    }
-);
+    verifiedUsername.focus();
+}
 
 
 // ========================================
@@ -520,17 +656,11 @@ claimUsernameButton.addEventListener(
     "click",
     async () => {
 
-        usernameError.textContent =
-            "";
-
+        usernameError.textContent = "";
 
         const username =
             verifiedUsername.value.trim();
 
-
-        /*
-         * Validate username locally first.
-         */
 
         const validationError =
             validateUsername(
@@ -547,10 +677,6 @@ claimUsernameButton.addEventListener(
         }
 
 
-        /*
-         * Get current Firebase user.
-         */
-
         const user =
             auth.currentUser;
 
@@ -565,7 +691,8 @@ claimUsernameButton.addEventListener(
 
 
         /*
-         * Email must be verified.
+         * Double-check verification before
+         * touching the database.
          */
 
         if (!user.emailVerified) {
@@ -600,45 +727,29 @@ claimUsernameButton.addEventListener(
 
 
             /*
-             * Username successfully claimed.
+             * Username successfully created.
              */
 
-            usernameSetup.classList.add(
-                "hidden"
-            );
-
-
-            verificationSection.classList.add(
-                "hidden"
-            );
-
-
-            socialSection.classList.remove(
-                "hidden"
-            );
-
-
-            logoutButton.classList.remove(
-                "hidden"
-            );
-
-
-            handleAuthenticatedUser(
-                user
+            showSocialScreen(
+                user,
+                {
+                    username:
+                        username
+                }
             );
 
 
         } catch (error) {
 
             console.error(
-                "Username claim error:",
+                "Username error:",
                 error
             );
 
 
             usernameError.textContent =
                 error.message ||
-                "Unable to claim username.";
+                "Unable to create your username.";
 
         } finally {
 
@@ -650,287 +761,15 @@ claimUsernameButton.addEventListener(
 
 
 // ========================================
-// AUTH STATE
+// SOCIAL SCREEN
 // ========================================
 
-listenForAuth(
-    (user) => {
-
-        currentAuthUser =
-            user;
-
-
-        /*
-         * Not logged in.
-         */
-
-        if (!user) {
-
-            showLoggedOut();
-
-            return;
-        }
-
-
-        /*
-         * Logged in but not verified.
-         */
-
-        if (!user.emailVerified) {
-
-            showVerificationScreen(
-                user
-            );
-
-            return;
-        }
-
-
-        /*
-         * Verified user.
-         *
-         * They may either already have a
-         * profile or need to choose a username.
-         */
-
-        checkUserProfile(
-            user
-        );
-    }
-);
-
-
-// ========================================
-// CHECK USER PROFILE
-// ========================================
-
-function checkUserProfile(
-    user
+function showSocialScreen(
+    user,
+    userData
 ) {
 
-    listenToUser(
-        user.uid,
-        (userData) => {
-
-            if (
-                userData &&
-                userData.username
-            ) {
-
-                /*
-                 * Existing verified user.
-                 */
-
-                handleAuthenticatedUser(
-                    user
-                );
-
-            } else {
-
-                /*
-                 * Verified but hasn't chosen
-                 * a username yet.
-                 */
-
-                showUsernameSetup(
-                    user
-                );
-            }
-        }
-    );
-}
-
-
-// ========================================
-// LOGGED OUT SCREEN
-// ========================================
-
-function showLoggedOut() {
-
-    authSection.classList.remove(
-        "hidden"
-    );
-
-    verificationSection.classList.add(
-        "hidden"
-    );
-
-    socialSection.classList.add(
-        "hidden"
-    );
-
-    logoutButton.classList.add(
-        "hidden"
-    );
-
-
-    currentUser.textContent =
-        "";
-
-
-    feed.innerHTML =
-        "";
-
-
-    if (unsubscribePosts) {
-
-        unsubscribePosts();
-
-        unsubscribePosts =
-            null;
-    }
-}
-
-
-// ========================================
-// VERIFICATION SCREEN
-// ========================================
-
-function showVerificationScreen(
-    user
-) {
-
-    authSection.classList.add(
-        "hidden"
-    );
-
-    verificationSection.classList.remove(
-        "hidden"
-    );
-
-    socialSection.classList.add(
-        "hidden"
-    );
-
-    logoutButton.classList.add(
-        "hidden"
-    );
-
-
-    verificationEmail.textContent =
-        user.email || "";
-
-
-    verificationMessage.textContent =
-        "";
-
-
-    usernameSetup.classList.add(
-        "hidden"
-    );
-
-
-    checkVerificationButton.classList.remove(
-        "hidden"
-    );
-
-
-    resendVerificationButton.classList.remove(
-        "hidden"
-    );
-
-
-    verifiedUsername.value =
-        "";
-
-
-    usernameError.textContent =
-        "";
-
-
-    if (unsubscribePosts) {
-
-        unsubscribePosts();
-
-        unsubscribePosts =
-            null;
-    }
-
-
-    feed.innerHTML =
-        "";
-}
-
-
-// ========================================
-// USERNAME SETUP SCREEN
-// ========================================
-
-function showUsernameSetup(
-    user
-) {
-
-    authSection.classList.add(
-        "hidden"
-    );
-
-    verificationSection.classList.remove(
-        "hidden"
-    );
-
-    socialSection.classList.add(
-        "hidden"
-    );
-
-    logoutButton.classList.add(
-        "hidden"
-    );
-
-
-    verificationEmail.textContent =
-        user.email || "";
-
-
-    verificationMessage.textContent =
-        "Your email is verified. Choose your username.";
-
-
-    usernameSetup.classList.remove(
-        "hidden"
-    );
-
-
-    checkVerificationButton.classList.add(
-        "hidden"
-    );
-
-
-    resendVerificationButton.classList.add(
-        "hidden"
-    );
-}
-
-
-// ========================================
-// VERIFIED USER / SOCIAL NETWORK
-// ========================================
-
-function handleAuthenticatedUser(
-    user
-) {
-
-    if (!user) {
-        return;
-    }
-
-
-    if (!user.emailVerified) {
-
-        showVerificationScreen(
-            user
-        );
-
-        return;
-    }
-
-
-    authSection.classList.add(
-        "hidden"
-    );
-
-    verificationSection.classList.add(
-        "hidden"
-    );
+    hideAllScreens();
 
     socialSection.classList.remove(
         "hidden"
@@ -941,30 +780,9 @@ function handleAuthenticatedUser(
     );
 
 
-    /*
-     * Load user's profile.
-     */
-
-    listenToUser(
-        user.uid,
-        (userData) => {
-
-            if (
-                userData &&
-                userData.username
-            ) {
-
-                currentUser.textContent =
-                    "@" +
-                    userData.username;
-
-            } else {
-
-                currentUser.textContent =
-                    user.email || "";
-            }
-        }
-    );
+    currentUser.textContent =
+        "@" +
+        userData.username;
 
 
     startFeed();
@@ -972,7 +790,87 @@ function handleAuthenticatedUser(
 
 
 // ========================================
-// CHARACTER COUNTER
+// LOGOUT
+// ========================================
+
+logoutButton.addEventListener(
+    "click",
+    async () => {
+
+        try {
+
+            await logout();
+
+        } catch (error) {
+
+            console.error(
+                "Logout error:",
+                error
+            );
+        }
+    }
+);
+
+
+// ========================================
+// HIDE ALL SCREENS
+// ========================================
+
+function hideAllScreens() {
+
+    authSection.classList.add(
+        "hidden"
+    );
+
+    verificationSection.classList.add(
+        "hidden"
+    );
+
+    socialSection.classList.add(
+        "hidden"
+    );
+
+    logoutButton.classList.add(
+        "hidden"
+    );
+}
+
+
+// ========================================
+// AUTH SCREEN
+// ========================================
+
+function showAuthScreen() {
+
+    hideAllScreens();
+
+    authSection.classList.remove(
+        "hidden"
+    );
+
+
+    authError.textContent = "";
+
+    verificationMessage.textContent = "";
+
+    usernameError.textContent = "";
+
+    verifiedUsername.value = "";
+
+    feed.innerHTML = "";
+
+
+    if (unsubscribePosts) {
+
+        unsubscribePosts();
+
+        unsubscribePosts = null;
+    }
+}
+
+
+// ========================================
+// POST CHARACTER COUNT
 // ========================================
 
 postText.addEventListener(
@@ -993,8 +891,7 @@ postButton.addEventListener(
     "click",
     async () => {
 
-        postError.textContent =
-            "";
+        postError.textContent = "";
 
 
         if (
@@ -1009,8 +906,7 @@ postButton.addEventListener(
         }
 
 
-        postButton.disabled =
-            true;
+        postButton.disabled = true;
 
 
         try {
@@ -1020,9 +916,7 @@ postButton.addEventListener(
             );
 
 
-            postText.value =
-                "";
-
+            postText.value = "";
 
             characterCount.textContent =
                 "0 / 280";
@@ -1042,8 +936,7 @@ postButton.addEventListener(
 
         } finally {
 
-            postButton.disabled =
-                false;
+            postButton.disabled = false;
         }
     }
 );
@@ -1072,21 +965,16 @@ function startFeed() {
 // RENDER FEED
 // ========================================
 
-function renderFeed(
-    posts
-) {
+function renderFeed(posts) {
 
-    feed.innerHTML =
-        "";
+    feed.innerHTML = "";
 
 
     for (
         const post of posts
     ) {
 
-        renderPost(
-            post
-        );
+        renderPost(post);
     }
 }
 
@@ -1095,9 +983,7 @@ function renderFeed(
 // RENDER POST
 // ========================================
 
-function renderPost(
-    post
-) {
+function renderPost(post) {
 
     const clone =
         postTemplate.content.cloneNode(
@@ -1137,7 +1023,7 @@ function renderPost(
 
 
     /*
-     * Load author profile.
+     * Author.
      */
 
     listenToUser(
@@ -1165,8 +1051,7 @@ function renderPost(
     /*
      * SECURITY:
      *
-     * textContent prevents somebody from
-     * putting HTML/JavaScript into a post.
+     * Never use innerHTML for user posts.
      */
 
     content.textContent =
@@ -1215,7 +1100,6 @@ function renderPost(
                     "liked"
                 );
 
-
                 likeButton.firstChild.textContent =
                     "♥ ";
 
@@ -1224,7 +1108,6 @@ function renderPost(
                 likeButton.classList.remove(
                     "liked"
                 );
-
 
                 likeButton.firstChild.textContent =
                     "♡ ";
@@ -1250,8 +1133,7 @@ function renderPost(
             }
 
 
-            likeButton.disabled =
-                true;
+            likeButton.disabled = true;
 
 
             try {
@@ -1269,8 +1151,7 @@ function renderPost(
 
             } finally {
 
-                likeButton.disabled =
-                    false;
+                likeButton.disabled = false;
             }
         }
     );
@@ -1286,15 +1167,9 @@ function renderPost(
 // FORMAT TIME
 // ========================================
 
-function formatTime(
-    timestamp
-) {
+function formatTime(timestamp) {
 
-    const date =
-        new Date(
-            timestamp
-        );
-
-
-    return date.toLocaleString();
+    return new Date(
+        timestamp
+    ).toLocaleString();
 }
