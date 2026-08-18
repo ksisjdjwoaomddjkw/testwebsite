@@ -9,7 +9,9 @@ import {
 } from "./auth.js";
 
 import {
-    listenToUser
+    listenToUser,
+    validateUsername,
+    claimUsername
 } from "./users.js";
 
 import {
@@ -23,53 +25,80 @@ import {
     auth
 } from "./firebase.js";
 
-import {
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-
 
 // ========================================
 // DOM ELEMENTS
 // ========================================
 
 const authSection =
-    document.getElementById("auth-section");
+    document.getElementById(
+        "auth-section"
+    );
 
 const verificationSection =
-    document.getElementById("verification-section");
+    document.getElementById(
+        "verification-section"
+    );
 
 const socialSection =
-    document.getElementById("social-section");
+    document.getElementById(
+        "social-section"
+    );
 
 const authTitle =
-    document.getElementById("auth-title");
+    document.getElementById(
+        "auth-title"
+    );
 
 const emailInput =
-    document.getElementById("email");
+    document.getElementById(
+        "email"
+    );
 
 const passwordInput =
-    document.getElementById("password");
+    document.getElementById(
+        "password"
+    );
 
 const usernameInput =
-    document.getElementById("username");
+    document.getElementById(
+        "username"
+    );
 
 const authButton =
-    document.getElementById("auth-button");
+    document.getElementById(
+        "auth-button"
+    );
 
 const switchAuth =
-    document.getElementById("switch-auth");
+    document.getElementById(
+        "switch-auth"
+    );
 
 const authError =
-    document.getElementById("auth-error");
+    document.getElementById(
+        "auth-error"
+    );
 
 const logoutButton =
-    document.getElementById("logout-button");
+    document.getElementById(
+        "logout-button"
+    );
 
 const currentUser =
-    document.getElementById("current-user");
+    document.getElementById(
+        "current-user"
+    );
+
+
+// ========================================
+// VERIFICATION ELEMENTS
+// ========================================
 
 const verificationEmail =
-    document.getElementById("verification-email");
+    document.getElementById(
+        "verification-email"
+    );
 
 const checkVerificationButton =
     document.getElementById(
@@ -91,42 +120,83 @@ const verificationMessage =
         "verification-message"
     );
 
+
+// ========================================
+// USERNAME SETUP
+// ========================================
+
+const usernameSetup =
+    document.getElementById(
+        "username-setup"
+    );
+
+const verifiedUsername =
+    document.getElementById(
+        "verified-username"
+    );
+
+const claimUsernameButton =
+    document.getElementById(
+        "claim-username-button"
+    );
+
+const usernameError =
+    document.getElementById(
+        "username-error"
+    );
+
+
+// ========================================
+// POST ELEMENTS
+// ========================================
+
 const postText =
-    document.getElementById("post-text");
+    document.getElementById(
+        "post-text"
+    );
 
 const postButton =
-    document.getElementById("post-button");
+    document.getElementById(
+        "post-button"
+    );
 
 const postError =
-    document.getElementById("post-error");
+    document.getElementById(
+        "post-error"
+    );
 
 const characterCount =
-    document.getElementById("character-count");
+    document.getElementById(
+        "character-count"
+    );
 
 const feed =
-    document.getElementById("feed");
+    document.getElementById(
+        "feed"
+    );
 
 const postTemplate =
-    document.getElementById("post-template");
+    document.getElementById(
+        "post-template"
+    );
 
 
 // ========================================
 // STATE
 // ========================================
 
-let loginMode = true;
+let loginMode =
+    true;
 
-let unsubscribePosts = null;
+let unsubscribePosts =
+    null;
 
-
-// Keep track of the currently authenticated
-// user for the like buttons.
-
-let currentAuthUser = null;
+let currentAuthUser =
+    null;
 
 
 // ========================================
-// LOGIN / SIGNUP MODE
+// LOGIN / SIGNUP SWITCH
 // ========================================
 
 switchAuth.addEventListener(
@@ -136,8 +206,10 @@ switchAuth.addEventListener(
         loginMode =
             !loginMode;
 
+
         authError.textContent =
             "";
+
 
         if (loginMode) {
 
@@ -149,6 +221,7 @@ switchAuth.addEventListener(
 
             switchAuth.textContent =
                 "Create an account";
+
 
             usernameInput.classList.add(
                 "hidden"
@@ -165,6 +238,7 @@ switchAuth.addEventListener(
             switchAuth.textContent =
                 "Already have an account? Log in";
 
+
             usernameInput.classList.remove(
                 "hidden"
             );
@@ -174,7 +248,7 @@ switchAuth.addEventListener(
 
 
 // ========================================
-// LOGIN / SIGNUP BUTTON
+// LOGIN / SIGNUP
 // ========================================
 
 authButton.addEventListener(
@@ -184,17 +258,18 @@ authButton.addEventListener(
         authError.textContent =
             "";
 
+
         const email =
             emailInput.value.trim();
 
         const password =
             passwordInput.value;
 
-        const username =
-            usernameInput.value.trim();
 
-
-        if (!email || !password) {
+        if (
+            !email ||
+            !password
+        ) {
 
             authError.textContent =
                 "Enter your email and password.";
@@ -202,6 +277,12 @@ authButton.addEventListener(
             return;
         }
 
+
+        /*
+         * Username is NOT required here anymore.
+         *
+         * It is selected after email verification.
+         */
 
         authButton.disabled =
             true;
@@ -218,18 +299,9 @@ authButton.addEventListener(
 
             } else {
 
-                if (!username) {
-
-                    authError.textContent =
-                        "Choose a username.";
-
-                    return;
-                }
-
                 await signup(
                     email,
-                    password,
-                    username
+                    password
                 );
             }
 
@@ -252,29 +324,10 @@ authButton.addEventListener(
             );
 
 
-            if (
-                error.message ===
-                "That username is already taken."
-            ) {
-
-                authError.textContent =
-                    error.message;
-
-            } else if (
-                error.message &&
-                error.message.startsWith(
-                    "Username"
-                )
-            ) {
-
-                authError.textContent =
-                    error.message;
-
-            } else {
-
-                authError.textContent =
-                    getAuthError(error);
-            }
+            authError.textContent =
+                getAuthError(
+                    error
+                );
 
         } finally {
 
@@ -328,7 +381,7 @@ verificationLogoutButton.addEventListener(
 
 
 // ========================================
-// EMAIL VERIFICATION
+// CHECK EMAIL VERIFICATION
 // ========================================
 
 checkVerificationButton.addEventListener(
@@ -337,6 +390,7 @@ checkVerificationButton.addEventListener(
 
         verificationMessage.textContent =
             "Checking...";
+
 
         checkVerificationButton.disabled =
             true;
@@ -348,34 +402,47 @@ checkVerificationButton.addEventListener(
                 await refreshVerificationStatus();
 
 
-            if (verified) {
-
-                verificationMessage.textContent =
-                    "Email verified! Loading...";
-
-                /*
-                 * Firebase's auth state may not
-                 * immediately refresh the UI after
-                 * reload(), so explicitly update it.
-                 */
-
-                handleAuthenticatedUser(
-                    auth.currentUser
-                );
-
-            } else {
+            if (!verified) {
 
                 verificationMessage.textContent =
                     "Your email is not verified yet. Check your inbox and click the verification link.";
 
+                return;
             }
+
+
+            /*
+             * Email is verified.
+             *
+             * Now show username setup.
+             */
+
+            verificationMessage.textContent =
+                "Email verified! Choose your username.";
+
+
+            usernameSetup.classList.remove(
+                "hidden"
+            );
+
+
+            checkVerificationButton.classList.add(
+                "hidden"
+            );
+
+
+            resendVerificationButton.classList.add(
+                "hidden"
+            );
+
 
         } catch (error) {
 
             console.error(
-                "Verification check error:",
+                "Verification error:",
                 error
             );
+
 
             verificationMessage.textContent =
                 "Unable to check verification status.";
@@ -389,12 +456,17 @@ checkVerificationButton.addEventListener(
 );
 
 
+// ========================================
+// RESEND VERIFICATION EMAIL
+// ========================================
+
 resendVerificationButton.addEventListener(
     "click",
     async () => {
 
         verificationMessage.textContent =
             "Sending...";
+
 
         resendVerificationButton.disabled =
             true;
@@ -404,13 +476,14 @@ resendVerificationButton.addEventListener(
 
             await resendVerificationEmail();
 
+
             verificationMessage.textContent =
                 "Verification email sent! Check your inbox.";
 
         } catch (error) {
 
             console.error(
-                "Verification email error:",
+                "Resend verification error:",
                 error
             );
 
@@ -440,6 +513,143 @@ resendVerificationButton.addEventListener(
 
 
 // ========================================
+// CLAIM USERNAME
+// ========================================
+
+claimUsernameButton.addEventListener(
+    "click",
+    async () => {
+
+        usernameError.textContent =
+            "";
+
+
+        const username =
+            verifiedUsername.value.trim();
+
+
+        /*
+         * Validate username locally first.
+         */
+
+        const validationError =
+            validateUsername(
+                username
+            );
+
+
+        if (validationError) {
+
+            usernameError.textContent =
+                validationError;
+
+            return;
+        }
+
+
+        /*
+         * Get current Firebase user.
+         */
+
+        const user =
+            auth.currentUser;
+
+
+        if (!user) {
+
+            usernameError.textContent =
+                "You are not logged in.";
+
+            return;
+        }
+
+
+        /*
+         * Email must be verified.
+         */
+
+        if (!user.emailVerified) {
+
+            usernameError.textContent =
+                "You must verify your email first.";
+
+            return;
+        }
+
+
+        claimUsernameButton.disabled =
+            true;
+
+
+        try {
+
+            const claimed =
+                await claimUsername(
+                    username,
+                    user.uid
+                );
+
+
+            if (!claimed) {
+
+                usernameError.textContent =
+                    "That username is already taken.";
+
+                return;
+            }
+
+
+            /*
+             * Username successfully claimed.
+             */
+
+            usernameSetup.classList.add(
+                "hidden"
+            );
+
+
+            verificationSection.classList.add(
+                "hidden"
+            );
+
+
+            socialSection.classList.remove(
+                "hidden"
+            );
+
+
+            logoutButton.classList.remove(
+                "hidden"
+            );
+
+
+            handleAuthenticatedUser(
+                user
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Username claim error:",
+                error
+            );
+
+
+            usernameError.textContent =
+                error.message ||
+                "Unable to claim username.";
+
+        } finally {
+
+            claimUsernameButton.disabled =
+                false;
+        }
+    }
+);
+
+
+// ========================================
 // AUTH STATE
 // ========================================
 
@@ -451,7 +661,7 @@ listenForAuth(
 
 
         /*
-         * Nobody is logged in.
+         * Not logged in.
          */
 
         if (!user) {
@@ -463,8 +673,7 @@ listenForAuth(
 
 
         /*
-         * User is logged in but hasn't
-         * verified their email.
+         * Logged in but not verified.
          */
 
         if (!user.emailVerified) {
@@ -478,10 +687,13 @@ listenForAuth(
 
 
         /*
-         * User is logged in and verified.
+         * Verified user.
+         *
+         * They may either already have a
+         * profile or need to choose a username.
          */
 
-        handleAuthenticatedUser(
+        checkUserProfile(
             user
         );
     }
@@ -489,7 +701,48 @@ listenForAuth(
 
 
 // ========================================
-// LOGGED OUT UI
+// CHECK USER PROFILE
+// ========================================
+
+function checkUserProfile(
+    user
+) {
+
+    listenToUser(
+        user.uid,
+        (userData) => {
+
+            if (
+                userData &&
+                userData.username
+            ) {
+
+                /*
+                 * Existing verified user.
+                 */
+
+                handleAuthenticatedUser(
+                    user
+                );
+
+            } else {
+
+                /*
+                 * Verified but hasn't chosen
+                 * a username yet.
+                 */
+
+                showUsernameSetup(
+                    user
+                );
+            }
+        }
+    );
+}
+
+
+// ========================================
+// LOGGED OUT SCREEN
 // ========================================
 
 function showLoggedOut() {
@@ -510,8 +763,10 @@ function showLoggedOut() {
         "hidden"
     );
 
+
     currentUser.textContent =
         "";
+
 
     feed.innerHTML =
         "";
@@ -528,7 +783,7 @@ function showLoggedOut() {
 
 
 // ========================================
-// VERIFICATION UI
+// VERIFICATION SCREEN
 // ========================================
 
 function showVerificationScreen(
@@ -555,7 +810,31 @@ function showVerificationScreen(
     verificationEmail.textContent =
         user.email || "";
 
+
     verificationMessage.textContent =
+        "";
+
+
+    usernameSetup.classList.add(
+        "hidden"
+    );
+
+
+    checkVerificationButton.classList.remove(
+        "hidden"
+    );
+
+
+    resendVerificationButton.classList.remove(
+        "hidden"
+    );
+
+
+    verifiedUsername.value =
+        "";
+
+
+    usernameError.textContent =
         "";
 
 
@@ -574,7 +853,56 @@ function showVerificationScreen(
 
 
 // ========================================
-// VERIFIED USER UI
+// USERNAME SETUP SCREEN
+// ========================================
+
+function showUsernameSetup(
+    user
+) {
+
+    authSection.classList.add(
+        "hidden"
+    );
+
+    verificationSection.classList.remove(
+        "hidden"
+    );
+
+    socialSection.classList.add(
+        "hidden"
+    );
+
+    logoutButton.classList.add(
+        "hidden"
+    );
+
+
+    verificationEmail.textContent =
+        user.email || "";
+
+
+    verificationMessage.textContent =
+        "Your email is verified. Choose your username.";
+
+
+    usernameSetup.classList.remove(
+        "hidden"
+    );
+
+
+    checkVerificationButton.classList.add(
+        "hidden"
+    );
+
+
+    resendVerificationButton.classList.add(
+        "hidden"
+    );
+}
+
+
+// ========================================
+// VERIFIED USER / SOCIAL NETWORK
 // ========================================
 
 function handleAuthenticatedUser(
@@ -585,11 +913,6 @@ function handleAuthenticatedUser(
         return;
     }
 
-
-    /*
-     * Don't allow an unverified account
-     * into the social section.
-     */
 
     if (!user.emailVerified) {
 
@@ -619,7 +942,7 @@ function handleAuthenticatedUser(
 
 
     /*
-     * Load the user's profile.
+     * Load user's profile.
      */
 
     listenToUser(
@@ -644,16 +967,12 @@ function handleAuthenticatedUser(
     );
 
 
-    /*
-     * Start the feed.
-     */
-
     startFeed();
 }
 
 
 // ========================================
-// POSTS
+// CHARACTER COUNTER
 // ========================================
 
 postText.addEventListener(
@@ -665,6 +984,10 @@ postText.addEventListener(
     }
 );
 
+
+// ========================================
+// CREATE POST
+// ========================================
 
 postButton.addEventListener(
     "click",
@@ -700,6 +1023,7 @@ postButton.addEventListener(
             postText.value =
                 "";
 
+
             characterCount.textContent =
                 "0 / 280";
 
@@ -710,6 +1034,7 @@ postButton.addEventListener(
                 "Post error:",
                 error
             );
+
 
             postError.textContent =
                 error.message ||
@@ -725,7 +1050,7 @@ postButton.addEventListener(
 
 
 // ========================================
-// FEED
+// START FEED
 // ========================================
 
 function startFeed() {
@@ -743,6 +1068,10 @@ function startFeed() {
 }
 
 
+// ========================================
+// RENDER FEED
+// ========================================
+
 function renderFeed(
     posts
 ) {
@@ -751,7 +1080,9 @@ function renderFeed(
         "";
 
 
-    for (const post of posts) {
+    for (
+        const post of posts
+    ) {
 
         renderPost(
             post
@@ -832,12 +1163,10 @@ function renderPost(
 
 
     /*
-     * IMPORTANT:
-     * Use textContent rather than innerHTML.
+     * SECURITY:
      *
-     * This prevents HTML/JavaScript
-     * entered into posts from becoming
-     * executable HTML.
+     * textContent prevents somebody from
+     * putting HTML/JavaScript into a post.
      */
 
     content.textContent =
@@ -877,12 +1206,15 @@ function renderPost(
 
             if (
                 currentAuthUser &&
-                likes[currentAuthUser.uid]
+                likes[
+                    currentAuthUser.uid
+                ]
             ) {
 
                 likeButton.classList.add(
                     "liked"
                 );
+
 
                 likeButton.firstChild.textContent =
                     "♥ ";
@@ -892,6 +1224,7 @@ function renderPost(
                 likeButton.classList.remove(
                     "liked"
                 );
+
 
                 likeButton.firstChild.textContent =
                     "♡ ";
@@ -950,7 +1283,7 @@ function renderPost(
 
 
 // ========================================
-// TIME FORMAT
+// FORMAT TIME
 // ========================================
 
 function formatTime(
