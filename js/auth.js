@@ -11,13 +11,15 @@ import {
     auth
 } from "./firebase.js";
 
-import {
-    validateUsername,
-    claimUsername
-} from "./users.js";
 
+// ========================================
+// LOGIN
+// ========================================
 
-export async function login(email, password) {
+export async function login(
+    email,
+    password
+) {
 
     return await signInWithEmailAndPassword(
         auth,
@@ -27,19 +29,18 @@ export async function login(email, password) {
 }
 
 
+// ========================================
+// SIGN UP
+// ========================================
+
 export async function signup(
     email,
-    password,
-    username
+    password
 ) {
 
-    const usernameError =
-        validateUsername(username);
-
-    if (usernameError) {
-        throw new Error(usernameError);
-    }
-
+    /*
+     * Create Firebase Authentication account.
+     */
 
     const credential =
         await createUserWithEmailAndPassword(
@@ -48,35 +49,11 @@ export async function signup(
             password
         );
 
-    const uid =
-        credential.user.uid;
-
 
     try {
 
         /*
-         * Reserve the username.
-         */
-
-        const claimed =
-            await claimUsername(
-                username,
-                uid
-            );
-
-
-        if (!claimed) {
-
-            await credential.user.delete();
-
-            throw new Error(
-                "That username is already taken."
-            );
-        }
-
-
-        /*
-         * Send the verification email.
+         * Send Firebase's verification email.
          */
 
         await sendEmailVerification(
@@ -86,24 +63,30 @@ export async function signup(
 
         return credential;
 
-
     } catch (error) {
 
         /*
-         * If signup fails, clean up the
-         * newly-created authentication account.
+         * If the verification email couldn't
+         * be sent, clean up the new account.
          */
 
         try {
+
             await credential.user.delete();
+
         } catch {
-            // Ignore cleanup failure.
+            // Ignore cleanup error.
         }
+
 
         throw error;
     }
 }
 
+
+// ========================================
+// RESEND VERIFICATION EMAIL
+// ========================================
 
 export async function resendVerificationEmail() {
 
@@ -112,6 +95,7 @@ export async function resendVerificationEmail() {
 
 
     if (!user) {
+
         throw new Error(
             "You are not logged in."
         );
@@ -119,13 +103,20 @@ export async function resendVerificationEmail() {
 
 
     if (user.emailVerified) {
+
         return;
     }
 
 
-    await sendEmailVerification(user);
+    await sendEmailVerification(
+        user
+    );
 }
 
+
+// ========================================
+// REFRESH VERIFICATION STATUS
+// ========================================
 
 export async function refreshVerificationStatus() {
 
@@ -134,16 +125,37 @@ export async function refreshVerificationStatus() {
 
 
     if (!user) {
+
         return false;
     }
 
 
+    /*
+     * Reload the Firebase user so
+     * emailVerified gets updated.
+     */
+
     await reload(user);
+
+
+    /*
+     * Force-refresh the ID token so the
+     * Realtime Database Rules receive the
+     * updated email_verified claim.
+     */
+
+    await user.getIdToken(
+        true
+    );
 
 
     return auth.currentUser.emailVerified;
 }
 
+
+// ========================================
+// LOG OUT
+// ========================================
 
 export async function logout() {
 
@@ -152,7 +164,13 @@ export async function logout() {
 }
 
 
-export function listenForAuth(callback) {
+// ========================================
+// AUTH STATE LISTENER
+// ========================================
+
+export function listenForAuth(
+    callback
+) {
 
     return onAuthStateChanged(
         auth,
@@ -161,33 +179,56 @@ export function listenForAuth(callback) {
 }
 
 
-export function getAuthError(error) {
+// ========================================
+// FIREBASE ERROR MESSAGES
+// ========================================
+
+export function getAuthError(
+    error
+) {
 
     switch (error.code) {
 
         case "auth/invalid-credential":
+
             return "Incorrect email or password.";
 
+
         case "auth/email-already-in-use":
+
             return "That email is already registered.";
 
+
         case "auth/invalid-email":
+
             return "That email address is invalid.";
 
+
         case "auth/weak-password":
+
             return "Password is too weak.";
 
+
         case "auth/user-not-found":
+
             return "Account not found.";
 
+
         case "auth/wrong-password":
+
             return "Incorrect password.";
 
+
         case "auth/too-many-requests":
+
             return "Too many attempts. Try again later.";
 
+
         default:
-            return error.message ||
-                "Something went wrong.";
+
+            return (
+                error.message ||
+                "Something went wrong."
+            );
     }
 }
