@@ -2,7 +2,9 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    sendEmailVerification,
+    reload
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
 import {
@@ -34,12 +36,8 @@ export async function signup(
     const usernameError =
         validateUsername(username);
 
-
     if (usernameError) {
-
-        throw new Error(
-            usernameError
-        );
+        throw new Error(usernameError);
     }
 
 
@@ -50,12 +48,15 @@ export async function signup(
             password
         );
 
-
     const uid =
         credential.user.uid;
 
 
     try {
+
+        /*
+         * Reserve the username.
+         */
 
         const claimed =
             await claimUsername(
@@ -74,24 +75,73 @@ export async function signup(
         }
 
 
+        /*
+         * Send the verification email.
+         */
+
+        await sendEmailVerification(
+            credential.user
+        );
+
+
         return credential;
 
 
     } catch (error) {
 
         /*
-         * If anything goes wrong,
-         * remove the newly-created account.
+         * If signup fails, clean up the
+         * newly-created authentication account.
          */
 
         try {
             await credential.user.delete();
         } catch {
-            // Ignore cleanup error.
+            // Ignore cleanup failure.
         }
 
         throw error;
     }
+}
+
+
+export async function resendVerificationEmail() {
+
+    const user =
+        auth.currentUser;
+
+
+    if (!user) {
+        throw new Error(
+            "You are not logged in."
+        );
+    }
+
+
+    if (user.emailVerified) {
+        return;
+    }
+
+
+    await sendEmailVerification(user);
+}
+
+
+export async function refreshVerificationStatus() {
+
+    const user =
+        auth.currentUser;
+
+
+    if (!user) {
+        return false;
+    }
+
+
+    await reload(user);
+
+
+    return auth.currentUser.emailVerified;
 }
 
 
@@ -132,6 +182,9 @@ export function getAuthError(error) {
 
         case "auth/wrong-password":
             return "Incorrect password.";
+
+        case "auth/too-many-requests":
+            return "Too many attempts. Try again later.";
 
         default:
             return error.message ||
