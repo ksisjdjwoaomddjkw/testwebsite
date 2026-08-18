@@ -1,34 +1,187 @@
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+    background: #f3f4f6;
+    color: #222;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
-.container {
+header {
     background: white;
-    padding: 40px;
-    border-radius: 12px;
-    text-align: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
-h1 {
+.header-inner {
+    max-width: 700px;
+    margin: auto;
+    padding: 15px 20px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+main {
+    width: 100%;
+    max-width: 700px;
+    margin: 30px auto;
+    padding: 0 15px;
+}
+
+.card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+h2 {
     margin-top: 0;
 }
 
+input,
+textarea {
+    width: 100%;
+    padding: 12px;
+
+    border: 1px solid #ccc;
+    border-radius: 8px;
+
+    font-size: 15px;
+
+    margin-bottom: 10px;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
 button {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
-    background: #ffca28;
+    border: 0;
+    border-radius: 8px;
+
+    padding: 10px 16px;
+
+    background: #1877f2;
+    color: white;
+
+    font-size: 14px;
+    font-weight: bold;
+
     cursor: pointer;
-    font-size: 16px;
 }
 
 button:hover {
-    background: #f4b400;
+    opacity: 0.9;
+}
+
+button.secondary {
+    background: #eee;
+    color: #222;
+}
+
+.link-button {
+    background: transparent;
+    color: #1877f2;
+    display: block;
+    margin: 10px auto 0;
+}
+
+.post-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#character-count {
+    color: #777;
+    font-size: 13px;
+}
+
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.post-username {
+    font-size: 15px;
+}
+
+.post-time {
+    color: #888;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.post-content {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.post-actions {
+    margin-top: 15px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.like-button {
+    background: transparent;
+    color: #555;
+    padding: 5px 10px;
+}
+
+.like-button.liked {
+    color: #e91e63;
+}
+
+.feed-title {
+    margin-top: 30px;
+}
+
+.error {
+    color: #d32f2f;
+    min-height: 18px;
+    font-size: 14px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#current-user {
+    margin-right: 10px;
+    color: #555;
+    font-size: 14px;
+}
+
+@media (max-width: 600px) {
+
+    main {
+        margin-top: 15px;
+    }
+
+    .header-inner {
+        padding: 12px 15px;
+    }
+
+    header h1 {
+        font-size: 20px;
+    }
+
 }
