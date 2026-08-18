@@ -12,25 +12,46 @@ import {
 } from "./firebase.js";
 
 
+// ========================================
+// VALIDATE USERNAME
+// ========================================
+
 export function validateUsername(username) {
 
     if (!username) {
         return "Choose a username.";
     }
 
-    if (username.length < 3 || username.length > 20) {
+
+    if (
+        username.length < 3 ||
+        username.length > 20
+    ) {
+
         return "Username must be 3-20 characters.";
     }
 
-    if (!/^[A-Za-z0-9_]+$/.test(username)) {
+
+    if (
+        !/^[A-Za-z0-9_]+$/.test(username)
+    ) {
+
         return "Username can only contain letters, numbers, and underscores.";
     }
+
 
     return null;
 }
 
 
-export async function claimUsername(username, uid) {
+// ========================================
+// CLAIM USERNAME
+// ========================================
+
+export async function claimUsername(
+    username,
+    uid
+) {
 
     const usernameKey =
         username.toLowerCase();
@@ -43,14 +64,34 @@ export async function claimUsername(username, uid) {
         );
 
 
+    /*
+     * Transactions make the username claim
+     * atomic.
+     *
+     * If two people try to claim "Roblox"
+     * simultaneously, only one succeeds.
+     */
+
     const result =
         await runTransaction(
             usernameRef,
             (currentValue) => {
 
-                if (currentValue !== null) {
+                /*
+                 * Username already exists.
+                 */
+
+                if (
+                    currentValue !== null
+                ) {
+
                     return;
                 }
+
+
+                /*
+                 * Reserve username.
+                 */
 
                 return uid;
             }
@@ -58,19 +99,28 @@ export async function claimUsername(username, uid) {
 
 
     if (!result.committed) {
+
         return false;
     }
 
 
+    /*
+     * Create the user's profile.
+     */
+
     try {
 
         await set(
-            ref(database, `users/${uid}`),
+            ref(
+                database,
+                `users/${uid}`
+            ),
             {
                 username: username,
                 createdAt: serverTimestamp()
             }
         );
+
 
         return true;
 
@@ -81,17 +131,36 @@ export async function claimUsername(username, uid) {
          * release the username.
          */
 
-        await remove(usernameRef);
+        try {
+
+            await remove(
+                usernameRef
+            );
+
+        } catch {
+            // Ignore cleanup error.
+        }
+
 
         throw error;
     }
 }
 
 
-export function listenToUser(uid, callback) {
+// ========================================
+// LISTEN TO USER PROFILE
+// ========================================
+
+export function listenToUser(
+    uid,
+    callback
+) {
 
     const userRef =
-        ref(database, `users/${uid}`);
+        ref(
+            database,
+            `users/${uid}`
+        );
 
 
     return onValue(
