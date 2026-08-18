@@ -77,7 +77,7 @@
     <strong id="verification-email"></strong>
 
     <p>
-        Check your inbox and click the link.
+        Check your inbox and click the verification link.
     </p>
 
     <button id="check-verification-button">
@@ -88,7 +88,29 @@
         Resend verification email
     </button>
 
-    <button id="verification-logout-button" class="secondary">
+    <div id="username-setup" class="hidden">
+
+        <h3>Choose your username</h3>
+
+        <input
+            id="verified-username"
+            type="text"
+            placeholder="Username"
+            maxlength="20"
+        >
+
+        <button id="claim-username-button">
+            Continue
+        </button>
+
+        <p id="username-error" class="error"></p>
+
+    </div>
+
+    <button
+        id="verification-logout-button"
+        class="secondary"
+    >
         Log out
     </button>
 
