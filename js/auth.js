@@ -16,10 +16,7 @@ import {
 // LOGIN
 // ========================================
 
-export async function login(
-    email,
-    password
-) {
+export async function login(email, password) {
 
     return await signInWithEmailAndPassword(
         auth,
@@ -33,14 +30,7 @@ export async function login(
 // SIGN UP
 // ========================================
 
-export async function signup(
-    email,
-    password
-) {
-
-    /*
-     * Create Firebase Authentication account.
-     */
+export async function signup(email, password) {
 
     const credential =
         await createUserWithEmailAndPassword(
@@ -49,35 +39,27 @@ export async function signup(
             password
         );
 
-
     try {
-
-        /*
-         * Send Firebase's verification email.
-         */
 
         await sendEmailVerification(
             credential.user
         );
-
 
         return credential;
 
     } catch (error) {
 
         /*
-         * If the verification email couldn't
-         * be sent, clean up the new account.
+         * If Firebase couldn't send the
+         * verification email, remove the
+         * newly-created account.
          */
 
         try {
-
             await credential.user.delete();
-
         } catch {
             // Ignore cleanup error.
         }
-
 
         throw error;
     }
@@ -90,64 +72,48 @@ export async function signup(
 
 export async function resendVerificationEmail() {
 
-    const user =
-        auth.currentUser;
-
+    const user = auth.currentUser;
 
     if (!user) {
-
         throw new Error(
             "You are not logged in."
         );
     }
 
-
     if (user.emailVerified) {
-
         return;
     }
 
-
-    await sendEmailVerification(
-        user
-    );
+    await sendEmailVerification(user);
 }
 
 
 // ========================================
-// REFRESH VERIFICATION STATUS
+// CHECK VERIFICATION
 // ========================================
 
-export async function refreshVerificationStatus() {
+export async function checkEmailVerified() {
 
-    const user =
-        auth.currentUser;
-
+    const user = auth.currentUser;
 
     if (!user) {
-
         return false;
     }
 
-
     /*
-     * Reload the Firebase user so
-     * emailVerified gets updated.
+     * Get the newest user information
+     * from Firebase Authentication.
      */
 
     await reload(user);
 
-
     /*
-     * Force-refresh the ID token so the
-     * Realtime Database Rules receive the
-     * updated email_verified claim.
+     * Refresh the ID token so Firebase
+     * Security Rules receive the new
+     * email_verified claim.
      */
 
-    await user.getIdToken(
-        true
-    );
-
+    await user.getIdToken(true);
 
     return auth.currentUser.emailVerified;
 }
@@ -158,19 +124,15 @@ export async function refreshVerificationStatus() {
 // ========================================
 
 export async function logout() {
-
     await signOut(auth);
-
 }
 
 
 // ========================================
-// AUTH STATE LISTENER
+// AUTH STATE
 // ========================================
 
-export function listenForAuth(
-    callback
-) {
+export function listenForAuth(callback) {
 
     return onAuthStateChanged(
         auth,
@@ -180,52 +142,38 @@ export function listenForAuth(
 
 
 // ========================================
-// FIREBASE ERROR MESSAGES
+// ERROR MESSAGES
 // ========================================
 
-export function getAuthError(
-    error
-) {
+export function getAuthError(error) {
 
     switch (error.code) {
 
         case "auth/invalid-credential":
-
             return "Incorrect email or password.";
 
-
         case "auth/email-already-in-use":
-
             return "That email is already registered.";
 
-
         case "auth/invalid-email":
-
             return "That email address is invalid.";
 
-
         case "auth/weak-password":
-
             return "Password is too weak.";
 
-
         case "auth/user-not-found":
-
             return "Account not found.";
 
-
         case "auth/wrong-password":
-
-            return "Incorrect password.";
-
+            return "Incorrect email or password.";
 
         case "auth/too-many-requests":
+            return "Too many attempts. Please wait and try again.";
 
-            return "Too many attempts. Try again later.";
-
+        case "auth/network-request-failed":
+            return "Network error. Check your internet connection.";
 
         default:
-
             return (
                 error.message ||
                 "Something went wrong."
