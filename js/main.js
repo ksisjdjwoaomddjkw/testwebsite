@@ -583,11 +583,6 @@ import {
     auth
 } from "./firebase.js";
 
-
-auth.onAuthStateChanged =
-    undefined;
-
-
 /*
  * Firebase's onAuthStateChanged
  * is already handled in auth.js.
