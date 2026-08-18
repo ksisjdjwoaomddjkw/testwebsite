@@ -3,17 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Test</title>
+
+    <title>Mini Social</title>
+
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="container">
-        <h1>🔥 Firebase Test</h1>
-        <p>If you can see this page, your website is working!</p>
-        <button onclick="test()">Test Button</button>
-        <p id="result"></p>
-    </div>
 
-    <script src="script.js"></script>
+<body>
+
+    <header>
+        <div class="header-inner">
+            <h1>Mini Social</h1>
+
+            <div id="user-area">
+                <span id="current-user"></span>
+                <button id="logout-button" class="secondary hidden">
+                    Log out
+                </button>
+            </div>
+        </div>
+    </header>
+
+
+    <main>
+
+        <!-- Authentication -->
+
+        <section id="auth-section" class="card">
+
+            <h2 id="auth-title">Log in</h2>
+
+            <input
+                id="email"
+                type="email"
+                placeholder="Email"
+                autocomplete="email"
+            >
+
+            <input
+                id="password"
+                type="password"
+                placeholder="Password"
+                autocomplete="current-password"
+            >
+
+            <input
+                id="username"
+                type="text"
+                placeholder="Username"
+                maxlength="20"
+                class="hidden"
+            >
+
+            <button id="auth-button">
+                Log in
+            </button>
+
+            <button id="switch-auth" class="link-button">
+                Create an account
+            </button>
+
+            <p id="auth-error" class="error"></p>
+
+        </section>
+
+
+        <!-- Social network -->
+
+        <section id="social-section" class="hidden">
+
+            <div class="card">
+
+                <h2>Create a post</h2>
+
+                <textarea
+                    id="post-text"
+                    maxlength="280"
+                    placeholder="What's happening?"
+                ></textarea>
+
+                <div class="post-controls">
+
+                    <span id="character-count">
+                        0 / 280
+                    </span>
+
+                    <button id="post-button">
+                        Post
+                    </button>
+
+                </div>
+
+                <p id="post-error" class="error"></p>
+
+            </div>
+
+
+            <h2 class="feed-title">
+                Latest posts
+            </h2>
+
+            <div id="feed"></div>
+
+        </section>
+
+    </main>
+
+
+    <template id="post-template">
+
+        <article class="post card">
+
+            <div class="post-header">
+
+                <div>
+                    <strong class="post-username"></strong>
+                    <span class="post-time"></span>
+                </div>
+
+            </div>
+
+            <div class="post-content"></div>
+
+            <div class="post-actions">
+
+                <button class="like-button">
+                    ♡ <span class="like-count">0</span>
+                </button>
+
+            </div>
+
+        </article>
+
+    </template>
+
+
+    <script type="module" src="script.js"></script>
+
 </body>
 </html>
