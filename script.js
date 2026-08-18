@@ -18,7 +18,8 @@ import {
     onValue,
     update,
     remove,
-    serverTimestamp
+    serverTimestamp,
+    runTransaction
 } from
     "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
 
@@ -193,42 +194,117 @@ authButton.addEventListener("click", async () => {
                 password
             );
 
-        } else {
+} else {
 
-            const username =
-                usernameInput.value.trim();
+    const username =
+        usernameInput.value.trim();
 
-            if (!username) {
+    if (!username) {
+        authError.textContent =
+            "Choose a username.";
+        return;
+    }
 
-                authError.textContent =
-                    "Choose a username.";
+    if (username.length < 3 || username.length > 20) {
+        authError.textContent =
+            "Username must be 3-20 characters.";
+        return;
+    }
 
-                return;
-            }
+    if (!/^[A-Za-z0-9_]+$/.test(username)) {
+        authError.textContent =
+            "Username can only contain letters, numbers, and underscores.";
+        return;
+    }
 
-            if (username.length < 3) {
+    /*
+        Normalize the username so usernames are
+        case-insensitive.
+    */
 
-                authError.textContent =
-                    "Username must be at least 3 characters.";
+    const usernameKey =
+        username.toLowerCase();
 
-                return;
-            }
+    /*
+        Create Firebase Authentication account.
+    */
 
-            const credential =
-                await createUserWithEmailAndPassword(
-                    auth,
-                    email,
-                    password
-                );
+    const credential =
+        await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password
+        );
 
-            await set(
-                ref(database, `users/${credential.user.uid}`),
-                {
-                    username: username,
-                    createdAt: serverTimestamp()
+    const uid =
+        credential.user.uid;
+
+    /*
+        Atomically claim the username.
+
+        If someone else already owns it,
+        the transaction returns committed=false.
+    */
+
+    const usernameRef =
+        ref(database, `usernames/${usernameKey}`);
+
+    const result =
+        await runTransaction(
+            usernameRef,
+            (currentValue) => {
+
+                if (currentValue !== null) {
+
+                    return;
                 }
-            );
-        }
+
+                return uid;
+            }
+        );
+
+    /*
+        Username was already taken.
+    */
+
+    if (!result.committed) {
+
+        await credential.user.delete();
+
+        authError.textContent =
+            "That username is already taken.";
+
+        return;
+    }
+
+    /*
+        Create the user's profile.
+    */
+
+    try {
+
+        await set(
+            ref(database, `users/${uid}`),
+            {
+                username: username,
+                createdAt: serverTimestamp()
+            }
+        );
+
+    } catch (error) {
+
+        /*
+            If profile creation failed,
+            release the username reservation.
+        */
+
+        await remove(usernameRef);
+
+        await credential.user.delete();
+
+        throw error;
+    }
+}
 
         emailInput.value = "";
         passwordInput.value = "";
