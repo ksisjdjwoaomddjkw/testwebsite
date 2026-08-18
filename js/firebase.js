@@ -10,6 +10,9 @@ import {
     getDatabase
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
 
+import {
+    getStorage
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
 
 const firebaseConfig = {
 
