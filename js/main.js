@@ -3,6 +3,8 @@ import {
     login,
     signup,
     logout,
+    resendVerificationEmail,
+    refreshVerificationStatus,
     getAuthError
 } from "./auth.js";
 
@@ -17,9 +19,24 @@ import {
     toggleLike
 } from "./posts.js";
 
+import {
+    auth
+} from "./firebase.js";
+
+import {
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+
+
+// ========================================
+// DOM ELEMENTS
+// ========================================
 
 const authSection =
     document.getElementById("auth-section");
+
+const verificationSection =
+    document.getElementById("verification-section");
 
 const socialSection =
     document.getElementById("social-section");
@@ -51,6 +68,29 @@ const logoutButton =
 const currentUser =
     document.getElementById("current-user");
 
+const verificationEmail =
+    document.getElementById("verification-email");
+
+const checkVerificationButton =
+    document.getElementById(
+        "check-verification-button"
+    );
+
+const resendVerificationButton =
+    document.getElementById(
+        "resend-verification-button"
+    );
+
+const verificationLogoutButton =
+    document.getElementById(
+        "verification-logout-button"
+    );
+
+const verificationMessage =
+    document.getElementById(
+        "verification-message"
+    );
+
 const postText =
     document.getElementById("post-text");
 
@@ -70,14 +110,24 @@ const postTemplate =
     document.getElementById("post-template");
 
 
+// ========================================
+// STATE
+// ========================================
+
 let loginMode = true;
 
 let unsubscribePosts = null;
 
 
-/*
- * LOGIN / SIGNUP SWITCH
- */
+// Keep track of the currently authenticated
+// user for the like buttons.
+
+let currentAuthUser = null;
+
+
+// ========================================
+// LOGIN / SIGNUP MODE
+// ========================================
 
 switchAuth.addEventListener(
     "click",
@@ -86,10 +136,8 @@ switchAuth.addEventListener(
         loginMode =
             !loginMode;
 
-
         authError.textContent =
             "";
-
 
         if (loginMode) {
 
@@ -120,16 +168,14 @@ switchAuth.addEventListener(
             usernameInput.classList.remove(
                 "hidden"
             );
-
         }
-
     }
 );
 
 
-/*
- * LOGIN / SIGNUP
- */
+// ========================================
+// LOGIN / SIGNUP BUTTON
+// ========================================
 
 authButton.addEventListener(
     "click",
@@ -137,7 +183,6 @@ authButton.addEventListener(
 
         authError.textContent =
             "";
-
 
         const email =
             emailInput.value.trim();
@@ -158,6 +203,10 @@ authButton.addEventListener(
         }
 
 
+        authButton.disabled =
+            true;
+
+
         try {
 
             if (loginMode) {
@@ -169,12 +218,19 @@ authButton.addEventListener(
 
             } else {
 
+                if (!username) {
+
+                    authError.textContent =
+                        "Choose a username.";
+
+                    return;
+                }
+
                 await signup(
                     email,
                     password,
                     username
                 );
-
             }
 
 
@@ -190,7 +246,10 @@ authButton.addEventListener(
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                "Authentication error:",
+                error
+            );
 
 
             if (
@@ -201,9 +260,12 @@ authButton.addEventListener(
                 authError.textContent =
                     error.message;
 
-            } else if (error.message?.startsWith(
-                "Username"
-            )) {
+            } else if (
+                error.message &&
+                error.message.startsWith(
+                    "Username"
+                )
+            ) {
 
                 authError.textContent =
                     error.message;
@@ -212,118 +274,387 @@ authButton.addEventListener(
 
                 authError.textContent =
                     getAuthError(error);
-
             }
 
-        }
+        } finally {
 
+            authButton.disabled =
+                false;
+        }
     }
 );
 
 
-/*
- * LOGOUT
- */
+// ========================================
+// LOGOUT
+// ========================================
 
 logoutButton.addEventListener(
     "click",
     async () => {
 
-        await logout();
+        try {
 
+            await logout();
+
+        } catch (error) {
+
+            console.error(
+                "Logout error:",
+                error
+            );
+        }
     }
 );
 
 
-/*
- * AUTH STATE
- */
+verificationLogoutButton.addEventListener(
+    "click",
+    async () => {
+
+        try {
+
+            await logout();
+
+        } catch (error) {
+
+            console.error(
+                "Logout error:",
+                error
+            );
+        }
+    }
+);
+
+
+// ========================================
+// EMAIL VERIFICATION
+// ========================================
+
+checkVerificationButton.addEventListener(
+    "click",
+    async () => {
+
+        verificationMessage.textContent =
+            "Checking...";
+
+        checkVerificationButton.disabled =
+            true;
+
+
+        try {
+
+            const verified =
+                await refreshVerificationStatus();
+
+
+            if (verified) {
+
+                verificationMessage.textContent =
+                    "Email verified! Loading...";
+
+                /*
+                 * Firebase's auth state may not
+                 * immediately refresh the UI after
+                 * reload(), so explicitly update it.
+                 */
+
+                handleAuthenticatedUser(
+                    auth.currentUser
+                );
+
+            } else {
+
+                verificationMessage.textContent =
+                    "Your email is not verified yet. Check your inbox and click the verification link.";
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Verification check error:",
+                error
+            );
+
+            verificationMessage.textContent =
+                "Unable to check verification status.";
+
+        } finally {
+
+            checkVerificationButton.disabled =
+                false;
+        }
+    }
+);
+
+
+resendVerificationButton.addEventListener(
+    "click",
+    async () => {
+
+        verificationMessage.textContent =
+            "Sending...";
+
+        resendVerificationButton.disabled =
+            true;
+
+
+        try {
+
+            await resendVerificationEmail();
+
+            verificationMessage.textContent =
+                "Verification email sent! Check your inbox.";
+
+        } catch (error) {
+
+            console.error(
+                "Verification email error:",
+                error
+            );
+
+
+            if (
+                error.code ===
+                "auth/too-many-requests"
+            ) {
+
+                verificationMessage.textContent =
+                    "Too many requests. Please wait before trying again.";
+
+            } else {
+
+                verificationMessage.textContent =
+                    error.message ||
+                    "Unable to send verification email.";
+            }
+
+        } finally {
+
+            resendVerificationButton.disabled =
+                false;
+        }
+    }
+);
+
+
+// ========================================
+// AUTH STATE
+// ========================================
 
 listenForAuth(
     (user) => {
 
-        if (user) {
-
-            authSection.classList.add(
-                "hidden"
-            );
-
-            socialSection.classList.remove(
-                "hidden"
-            );
-
-            logoutButton.classList.remove(
-                "hidden"
-            );
+        currentAuthUser =
+            user;
 
 
-            listenToUser(
-                user.uid,
-                (userData) => {
+        /*
+         * Nobody is logged in.
+         */
 
-                    if (
-                        userData &&
-                        userData.username
-                    ) {
+        if (!user) {
 
-                        currentUser.textContent =
-                            "@" +
-                            userData.username;
+            showLoggedOut();
 
-                    } else {
-
-                        currentUser.textContent =
-                            user.email ||
-                            "";
-
-                    }
-
-                }
-            );
-
-
-            startFeed();
-
-
-        } else {
-
-            authSection.classList.remove(
-                "hidden"
-            );
-
-            socialSection.classList.add(
-                "hidden"
-            );
-
-            logoutButton.classList.add(
-                "hidden"
-            );
-
-            currentUser.textContent =
-                "";
-
-            feed.innerHTML =
-                "";
-
-
-            if (unsubscribePosts) {
-
-                unsubscribePosts();
-
-                unsubscribePosts =
-                    null;
-
-            }
-
+            return;
         }
 
+
+        /*
+         * User is logged in but hasn't
+         * verified their email.
+         */
+
+        if (!user.emailVerified) {
+
+            showVerificationScreen(
+                user
+            );
+
+            return;
+        }
+
+
+        /*
+         * User is logged in and verified.
+         */
+
+        handleAuthenticatedUser(
+            user
+        );
     }
 );
 
 
-/*
- * CHARACTER COUNTER
- */
+// ========================================
+// LOGGED OUT UI
+// ========================================
+
+function showLoggedOut() {
+
+    authSection.classList.remove(
+        "hidden"
+    );
+
+    verificationSection.classList.add(
+        "hidden"
+    );
+
+    socialSection.classList.add(
+        "hidden"
+    );
+
+    logoutButton.classList.add(
+        "hidden"
+    );
+
+    currentUser.textContent =
+        "";
+
+    feed.innerHTML =
+        "";
+
+
+    if (unsubscribePosts) {
+
+        unsubscribePosts();
+
+        unsubscribePosts =
+            null;
+    }
+}
+
+
+// ========================================
+// VERIFICATION UI
+// ========================================
+
+function showVerificationScreen(
+    user
+) {
+
+    authSection.classList.add(
+        "hidden"
+    );
+
+    verificationSection.classList.remove(
+        "hidden"
+    );
+
+    socialSection.classList.add(
+        "hidden"
+    );
+
+    logoutButton.classList.add(
+        "hidden"
+    );
+
+
+    verificationEmail.textContent =
+        user.email || "";
+
+    verificationMessage.textContent =
+        "";
+
+
+    if (unsubscribePosts) {
+
+        unsubscribePosts();
+
+        unsubscribePosts =
+            null;
+    }
+
+
+    feed.innerHTML =
+        "";
+}
+
+
+// ========================================
+// VERIFIED USER UI
+// ========================================
+
+function handleAuthenticatedUser(
+    user
+) {
+
+    if (!user) {
+        return;
+    }
+
+
+    /*
+     * Don't allow an unverified account
+     * into the social section.
+     */
+
+    if (!user.emailVerified) {
+
+        showVerificationScreen(
+            user
+        );
+
+        return;
+    }
+
+
+    authSection.classList.add(
+        "hidden"
+    );
+
+    verificationSection.classList.add(
+        "hidden"
+    );
+
+    socialSection.classList.remove(
+        "hidden"
+    );
+
+    logoutButton.classList.remove(
+        "hidden"
+    );
+
+
+    /*
+     * Load the user's profile.
+     */
+
+    listenToUser(
+        user.uid,
+        (userData) => {
+
+            if (
+                userData &&
+                userData.username
+            ) {
+
+                currentUser.textContent =
+                    "@" +
+                    userData.username;
+
+            } else {
+
+                currentUser.textContent =
+                    user.email || "";
+            }
+        }
+    );
+
+
+    /*
+     * Start the feed.
+     */
+
+    startFeed();
+}
+
+
+// ========================================
+// POSTS
+// ========================================
 
 postText.addEventListener(
     "input",
@@ -331,14 +662,9 @@ postText.addEventListener(
 
         characterCount.textContent =
             `${postText.value.length} / 280`;
-
     }
 );
 
-
-/*
- * CREATE POST
- */
 
 postButton.addEventListener(
     "click",
@@ -346,6 +672,22 @@ postButton.addEventListener(
 
         postError.textContent =
             "";
+
+
+        if (
+            !currentAuthUser ||
+            !currentAuthUser.emailVerified
+        ) {
+
+            postError.textContent =
+                "You must verify your email first.";
+
+            return;
+        }
+
+
+        postButton.disabled =
+            true;
 
 
         try {
@@ -364,25 +706,33 @@ postButton.addEventListener(
 
         } catch (error) {
 
+            console.error(
+                "Post error:",
+                error
+            );
+
             postError.textContent =
-                error.message;
+                error.message ||
+                "Unable to create post.";
 
+        } finally {
+
+            postButton.disabled =
+                false;
         }
-
     }
 );
 
 
-/*
- * START FEED
- */
+// ========================================
+// FEED
+// ========================================
 
 function startFeed() {
 
     if (unsubscribePosts) {
 
         unsubscribePosts();
-
     }
 
 
@@ -390,15 +740,12 @@ function startFeed() {
         listenToPosts(
             renderFeed
         );
-
 }
 
 
-/*
- * RENDER FEED
- */
-
-function renderFeed(posts) {
+function renderFeed(
+    posts
+) {
 
     feed.innerHTML =
         "";
@@ -406,18 +753,20 @@ function renderFeed(posts) {
 
     for (const post of posts) {
 
-        renderPost(post);
-
+        renderPost(
+            post
+        );
     }
-
 }
 
 
-/*
- * RENDER SINGLE POST
- */
+// ========================================
+// RENDER POST
+// ========================================
 
-function renderPost(post) {
+function renderPost(
+    post
+) {
 
     const clone =
         postTemplate.content.cloneNode(
@@ -426,7 +775,9 @@ function renderPost(post) {
 
 
     const article =
-        clone.querySelector(".post");
+        clone.querySelector(
+            ".post"
+        );
 
     const username =
         clone.querySelector(
@@ -455,25 +806,38 @@ function renderPost(post) {
 
 
     /*
-     * Load author profile
+     * Load author profile.
      */
 
     listenToUser(
         post.authorUid,
         (userData) => {
 
-            username.textContent =
-                userData?.username
-                    ? "@" +
-                      userData.username
-                    : "Unknown user";
+            if (
+                userData &&
+                userData.username
+            ) {
 
+                username.textContent =
+                    "@" +
+                    userData.username;
+
+            } else {
+
+                username.textContent =
+                    "Unknown user";
+            }
         }
     );
 
 
     /*
-     * Content
+     * IMPORTANT:
+     * Use textContent rather than innerHTML.
+     *
+     * This prevents HTML/JavaScript
+     * entered into posts from becoming
+     * executable HTML.
      */
 
     content.textContent =
@@ -481,7 +845,7 @@ function renderPost(post) {
 
 
     /*
-     * Timestamp
+     * Timestamp.
      */
 
     if (post.timestamp) {
@@ -490,12 +854,11 @@ function renderPost(post) {
             formatTime(
                 post.timestamp
             );
-
     }
 
 
     /*
-     * Likes
+     * Likes.
      */
 
     listenToLikes(
@@ -503,20 +866,18 @@ function renderPost(post) {
         (likes) => {
 
             const count =
-                Object.keys(likes).length;
+                Object.keys(
+                    likes
+                ).length;
 
 
             likeCount.textContent =
                 count;
 
 
-            const user =
-                window.firebaseCurrentUser;
-
-
             if (
-                user &&
-                likes[user.uid]
+                currentAuthUser &&
+                likes[currentAuthUser.uid]
             ) {
 
                 likeButton.classList.add(
@@ -534,20 +895,31 @@ function renderPost(post) {
 
                 likeButton.firstChild.textContent =
                     "♡ ";
-
             }
-
         }
     );
 
 
     /*
-     * Like button
+     * Like button.
      */
 
     likeButton.addEventListener(
         "click",
         async () => {
+
+            if (
+                !currentAuthUser ||
+                !currentAuthUser.emailVerified
+            ) {
+
+                return;
+            }
+
+
+            likeButton.disabled =
+                true;
+
 
             try {
 
@@ -557,10 +929,16 @@ function renderPost(post) {
 
             } catch (error) {
 
-                console.error(error);
+                console.error(
+                    "Like error:",
+                    error
+                );
 
+            } finally {
+
+                likeButton.disabled =
+                    false;
             }
-
         }
     );
 
@@ -568,55 +946,22 @@ function renderPost(post) {
     feed.appendChild(
         article
     );
-
 }
 
 
-/*
- * CURRENT USER
- *
- * This lets the UI know which
- * account is currently logged in.
- */
+// ========================================
+// TIME FORMAT
+// ========================================
 
-import {
-    auth
-} from "./firebase.js";
-
-/*
- * Firebase's onAuthStateChanged
- * is already handled in auth.js.
- *
- * We only need this value for
- * displaying the correct like icon.
- */
-
-import {
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-
-
-onAuthStateChanged(
-    auth,
-    (user) => {
-
-        window.firebaseCurrentUser =
-            user;
-
-    }
-);
-
-
-/*
- * TIME FORMAT
- */
-
-function formatTime(timestamp) {
+function formatTime(
+    timestamp
+) {
 
     const date =
-        new Date(timestamp);
+        new Date(
+            timestamp
+        );
 
 
     return date.toLocaleString();
-
 }
