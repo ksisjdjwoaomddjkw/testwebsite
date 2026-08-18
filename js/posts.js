@@ -13,14 +13,31 @@ import {
 } from "./firebase.js";
 
 
-export async function createPost(text) {
+// ========================================
+// CREATE POST
+// ========================================
+
+export async function createPost(
+    text
+) {
 
     const user =
         auth.currentUser;
 
 
     if (!user) {
-        throw new Error("You must be logged in.");
+
+        throw new Error(
+            "You must be logged in."
+        );
+    }
+
+
+    if (!user.emailVerified) {
+
+        throw new Error(
+            "You must verify your email first."
+        );
     }
 
 
@@ -29,39 +46,64 @@ export async function createPost(text) {
 
 
     if (!text) {
-        throw new Error("Write something first.");
+
+        throw new Error(
+            "Write something first."
+        );
     }
 
 
     if (text.length > 280) {
-        throw new Error("Your post is too long.");
+
+        throw new Error(
+            "Your post is too long."
+        );
     }
 
 
     const postRef =
-        push(ref(database, "posts"));
+        push(
+            ref(
+                database,
+                "posts"
+            )
+        );
 
 
     await set(
         postRef,
         {
-            authorUid: user.uid,
-            text: text,
-            timestamp: serverTimestamp()
+            authorUid:
+                user.uid,
+
+            text:
+                text,
+
+            timestamp:
+                serverTimestamp()
         }
     );
 }
 
 
-export function listenToPosts(callback) {
+// ========================================
+// LISTEN TO POSTS
+// ========================================
+
+export function listenToPosts(
+    callback
+) {
 
     const postsRef =
-        ref(database, "posts");
+        ref(
+            database,
+            "posts"
+        );
 
 
     return onValue(
         postsRef,
-        async (snapshot) => {
+        (snapshot) => {
 
             const posts = [];
 
@@ -71,7 +113,8 @@ export function listenToPosts(callback) {
 
                     posts.push({
 
-                        id: child.key,
+                        id:
+                            child.key,
 
                         ...child.val()
 
@@ -81,6 +124,10 @@ export function listenToPosts(callback) {
             );
 
 
+            /*
+             * Newest posts first.
+             */
+
             posts.sort(
                 (a, b) =>
                     (b.timestamp || 0) -
@@ -88,14 +135,24 @@ export function listenToPosts(callback) {
             );
 
 
-            callback(
-                posts.slice(0, 50)
-            );
+            /*
+             * Only display the newest 50.
+             */
 
+            callback(
+                posts.slice(
+                    0,
+                    50
+                )
+            );
         }
     );
 }
 
+
+// ========================================
+// LISTEN TO LIKES
+// ========================================
 
 export function listenToLikes(
     postId,
@@ -122,6 +179,10 @@ export function listenToLikes(
 }
 
 
+// ========================================
+// TOGGLE LIKE
+// ========================================
+
 export async function toggleLike(
     postId
 ) {
@@ -131,7 +192,18 @@ export async function toggleLike(
 
 
     if (!user) {
-        return;
+
+        throw new Error(
+            "You must be logged in."
+        );
+    }
+
+
+    if (!user.emailVerified) {
+
+        throw new Error(
+            "You must verify your email first."
+        );
     }
 
 
@@ -141,6 +213,10 @@ export async function toggleLike(
             `likes/${postId}/${user.uid}`
         );
 
+
+    /*
+     * Read the current like state once.
+     */
 
     await new Promise(
         (resolve, reject) => {
@@ -152,7 +228,9 @@ export async function toggleLike(
 
                     try {
 
-                        if (snapshot.exists()) {
+                        if (
+                            snapshot.exists()
+                        ) {
 
                             await remove(
                                 likeRef
@@ -164,8 +242,8 @@ export async function toggleLike(
                                 likeRef,
                                 true
                             );
-
                         }
+
 
                         resolve();
 
@@ -180,7 +258,6 @@ export async function toggleLike(
                     onlyOnce: true
                 }
             );
-
         }
     );
 }
